@@ -1,0 +1,70 @@
+version: '3.3'
+
+services:
+
+  php-fpm:
+    build:
+      context: .
+      dockerfile: ./.docker/php-fpm/Dockerfile
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  mariadb:
+    build:
+      context: .
+      dockerfile: ./.docker/mariadb/Dockerfile
+    restart: always
+    volumes:
+#      - ./.docker/mariadb:/docker-entrypoint-initdb.d
+      - data:/var/lib/mysql
+    ports:
+      - ${MYSQL_EXTERNAL_PORT}:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: .
+      dockerfile: ./.docker/nginx/Dockerfile
+    depends_on:
+      - php-fpm
+      - mariadb
+    ports:
+      - ${NGINX_EXTERNAL_PORT}:80
+    restart: unless-stopped
+    volumes:
+      - ./app:/app
+      - ./.docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+#      - ./.docker/nginx:/etc/nginx/conf.d
+    networks:
+      - app-network
+
+  phpmyadmin:
+    build:
+      context: .
+      dockerfile: ./.docker/phpmyadmin/Dockerfile
+    depends_on:
+      - mariadb
+    restart: always
+    ports:
+      - "${PHPMYADMIN_EXTERNAL_PORT}:80"
+    environment:
+      PMA_HOST: mariadb
+      PMA_ARBITRARY: 1
+    networks:
+      - app-network
+
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
